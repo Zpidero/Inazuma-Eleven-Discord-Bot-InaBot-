@@ -1,0 +1,17 @@
+services:
+  discord_bot:
+    build:
+      context: ./InaBot
+      dockerfile: Dockerfile
+      
+    ports:
+      - "8000:8000"
+    command: sh -c "sh /app/banners/InaBot.sh && uv run main.py"
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    
+    ports:
+      - "5000:5000"
+    command: sh -c "sh /app/banners/apibanner.sh && uv run uvicorn main:app --host 0.0.0.0 --port 5000"
