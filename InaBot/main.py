@@ -31,6 +31,22 @@ async def sync(ctx):
     await bot.tree.sync(guild=guild)
     await ctx.send(f"✅ Synced {len(bot.tree.get_commands())} commands!")
 
+#__________________________Help Command_________________________________
+@bot.tree.command(name="help", description="Show available commands")
+async def help_command(interaction: discord.Interaction):
+    embed = discord.Embed(
+        title="InaBot Commands",
+        description="Here's a list of available commands:",
+        color=discord.Color.green()
+    )
+    embed.add_field(name="/daily", value="Claim your daily card", inline=False)
+    embed.add_field(name="/collection", value="View your card collection", inline=False)
+    embed.add_field(name="/help", value="Show this help message", inline=False)
+    embed.add_field(name="/show [card name]", value="Show details of a card you own", inline=False)
+    embed.add_field(name="/last", value="Show details of the last card you claimed", inline=False)
+
+    await interaction.response.send_message(embed=embed, ephemeral=True)
+
 #__________________________Daily Command_________________________________
 
 @bot.tree.command(name="daily", description="Get your daily card")
@@ -85,30 +101,43 @@ async def collection(interaction: discord.Interaction):
         )
         return
 
-    embed = discord.Embed(
-        title=f"Collection of {interaction.user.display_name}",
-        description=f"You have **{len(cards)}** cards",
-        color=discord.Color.blurple()
-    )
-    for card in cards[-10:]:
-        embed.add_field(name=card[1], value=f"Obtained: {card[3][:10]}", inline=True)
+    per_page = 5
+    total_pages = (len(cards) + per_page - 1) // per_page
 
-    await interaction.response.send_message(embed=embed)
+    def build_embed(page: int) -> discord.Embed:
+        start = page * per_page
+        end = start + per_page
+        page_cards = cards[start:end]
 
-#__________________________Help Command_________________________________
-@bot.tree.command(name="help", description="Show available commands")
-async def help_command(interaction: discord.Interaction):
-    embed = discord.Embed(
-        title="InaBot Commands",
-        description="Here's a list of available commands:",
-        color=discord.Color.green()
-    )
-    embed.add_field(name="/daily", value="Claim your daily card", inline=False)
-    embed.add_field(name="/collection", value="View your card collection", inline=False)
-    embed.add_field(name="/help", value="Show this help message", inline=False)
-    embed.add_field(name="/show [card name]", value="Show details of a card you own", inline=False)
+        embed = discord.Embed(
+            title=f"Collection of {interaction.user.display_name}",
+            description=f"You have **{len(cards)}** cards — Page {page + 1}/{total_pages}",
+            color=discord.Color.blurple()
+        )
+        for card in page_cards:
+            embed.add_field(name=card[1], value=f"Obtained: {card[3][:10]}", inline=False)
+        return embed
 
-    await interaction.response.send_message(embed=embed, ephemeral=True)
+    class CollectionView(discord.ui.View):
+        def __init__(self):
+            super().__init__(timeout=60)
+            self.page = 0
+
+        @discord.ui.button(label="◀ Prev", style=discord.ButtonStyle.secondary)
+        async def prev(self, interaction: discord.Interaction, button: discord.ui.Button):
+            if self.page > 0:
+                self.page -= 1
+            await interaction.response.edit_message(embed=build_embed(self.page), view=self)
+
+        @discord.ui.button(label="Next ▶", style=discord.ButtonStyle.secondary)
+        async def next(self, interaction: discord.Interaction, button: discord.ui.Button):
+            if self.page < total_pages - 1:
+                self.page += 1
+            await interaction.response.edit_message(embed=build_embed(self.page), view=self)
+
+    await interaction.response.send_message(embed=build_embed(0), view=CollectionView())
+
+
 
 #__________________________Show Command__________________________________
 
@@ -169,7 +198,7 @@ async def show(interaction: discord.Interaction, card_name: str):
 
 async def show_player_embed(interaction: discord.Interaction, card: dict):
     async with aiohttp.ClientSession() as session:
-        async with session.get(f"{API_URL}/teams/{card['Team']}/image") as img_resp:
+        async with session.get(f"{API_URL}/teams/{card['Team']}/images") as img_resp:
             img_data = await img_resp.json()
             team_image = img_data.get("Image", "")
 
@@ -202,6 +231,28 @@ async def show_player_embed(interaction: discord.Interaction, card: dict):
     else:
         await interaction.response.send_message(embed=embed)
 
+#____________________Show Last Command__________________________________
+@bot.tree.command(name="last", description="Show details of the last card you claimed")
+async def last(interaction: discord.Interaction):
+    user_id = str(interaction.user.id)
+    cards = await get_collection(user_id)
+
+    if not cards:
+        await interaction.response.send_message(
+            "You don't have any cards yet. Use `/daily` to get your first card!", ephemeral=True
+        )
+        return
+
+    last_card = cards[-1]
+    async with aiohttp.ClientSession() as session:
+        async with session.get(f"{API_URL}/players/id/{last_card[0]}") as resp:
+            if resp.status != 200:
+                await interaction.response.send_message("Card not found", ephemeral=True)
+                return
+            card_data = await resp.json()
+            card = card_data[0]
+
+    await show_player_embed(interaction, card)
 
 
 
