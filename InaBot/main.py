@@ -22,14 +22,14 @@ API_URL = "http://api:5000"  # Cambiar aixo si la API está en un altre lloc
 async def on_ready():
     await init_db()
     await bot.tree.sync()
-    print(f"✅ Logged in as {bot.user}")
+    print(f"Logged in as {bot.user}")
 
 @bot.command()
 async def sync(ctx):
     guild = discord.Object(id=ctx.guild.id)
     bot.tree.copy_global_to(guild=guild)
     await bot.tree.sync(guild=guild)
-    await ctx.send(f"✅ Synced {len(bot.tree.get_commands())} commands!")
+    await ctx.send(f"✅ Synced {len(bot.tree.get_commands())} commands")
 
 #__________________________Help Command_________________________________
 @bot.tree.command(name="help", description="Show available commands")
@@ -89,17 +89,27 @@ async def daily(interaction: discord.Interaction):
 
 
 #__________________________Collection Command_________________________________
-
 @bot.tree.command(name="collection", description="See your card collection")
 async def collection(interaction: discord.Interaction):
     user_id = str(interaction.user.id)
-    cards = await get_collection(user_id)
+    raw_cards = await get_collection(user_id)
 
-    if not cards:
+    if not raw_cards:
         await interaction.response.send_message(
             "You don't have any cards yet. Use `/daily` to get your first card!", ephemeral=True
         )
         return
+
+    # Deduplicate: keep first occurrence of each card_id, count copies
+    card_counts = {}
+    seen = {}
+    for card in raw_cards:
+        card_id = card[0]
+        card_counts[card_id] = card_counts.get(card_id, 0) + 1
+        if card_id not in seen:
+            seen[card_id] = card
+
+    cards = list(seen.values())  # unique cards only
 
     per_page = 5
     total_pages = (len(cards) + per_page - 1) // per_page
@@ -111,11 +121,18 @@ async def collection(interaction: discord.Interaction):
 
         embed = discord.Embed(
             title=f"Collection of {interaction.user.display_name}",
-            description=f"You have **{len(cards)}** cards — Page {page + 1}/{total_pages}",
+            description=f"You have **{len(raw_cards)}** cards ({len(cards)} unique) — Page {page + 1}/{total_pages}",
             color=discord.Color.blurple()
         )
         for card in page_cards:
-            embed.add_field(name=card[1], value=f"Obtained: {card[3][:10]}", inline=False)
+            card_id = card[0]
+            count = card_counts[card_id]
+            duplicate_label = f" ✕{count}" if count > 1 else ""
+            embed.add_field(
+                name=f"{card[1]}{duplicate_label}",
+                value=f"ID: `{card_id}` | Obtained: {card[3][:10]}",
+                inline=False
+            )
         return embed
 
     class CollectionView(discord.ui.View):
@@ -136,9 +153,6 @@ async def collection(interaction: discord.Interaction):
             await interaction.response.edit_message(embed=build_embed(self.page), view=self)
 
     await interaction.response.send_message(embed=build_embed(0), view=CollectionView())
-
-
-
 #__________________________Show Command__________________________________
 
 @bot.tree.command(name="show", description="Show details of a specific card")
@@ -198,9 +212,29 @@ async def show(interaction: discord.Interaction, card_name: str):
 
 async def show_player_embed(interaction: discord.Interaction, card: dict):
     async with aiohttp.ClientSession() as session:
+
         async with session.get(f"{API_URL}/teams/{card['Team']}/images") as img_resp:
             img_data = await img_resp.json()
             team_image = img_data.get("Image", "")
+
+
+        async with session.get(f"{API_URL}/players/id/{card['ID']}/total") as total_resp:
+            total_data = await total_resp.json()
+            total = total_data.get("Total", 0)
+
+    # Color based on total stats
+    if total >= 999:
+        color = discord.Color.gold()        # Unique
+    elif total >= 960:
+        color = discord.Color.red()      # Legendary
+    elif total >= 950:
+        color = discord.Color.purple()        # Epic
+    elif total >= 940:
+        color = discord.Color.blue()       # Rare
+    elif total >= 930:
+        color = discord.Color.green()       # Uncommon
+    else:
+        color = discord.Color.light_grey()  # Common
 
     embed = discord.Embed(
         title=card["Name"],
@@ -214,15 +248,15 @@ async def show_player_embed(interaction: discord.Interaction, card: dict):
             f"**Age group:** {card['Age group']}\n\n"
             f"**Stats:**\n"
         ),
-        color=discord.Color.orange()
+        color=color
     )
-    embed.add_field(name="⚡ Power",        value=card["Power"],        inline=True)
-    embed.add_field(name="🎯 Control",      value=card["Control"],      inline=True)
-    embed.add_field(name="🔧 Technique",    value=card["Technique"],    inline=True)
-    embed.add_field(name="💪 Pressure",     value=card["Pressure"],     inline=True)
-    embed.add_field(name="🏃 Physical",     value=card["Physical"],     inline=True)
-    embed.add_field(name="💨 Agility",      value=card["Agility"],      inline=True)
-    embed.add_field(name="🧠 Intelligence", value=card["Intelligence"], inline=True)
+    embed.add_field(name="Power",        value=card["Power"],        inline=True)
+    embed.add_field(name="Control",      value=card["Control"],      inline=True)
+    embed.add_field(name="Technique",    value=card["Technique"],    inline=True)
+    embed.add_field(name="Pressure",     value=card["Pressure"],     inline=True)
+    embed.add_field(name="Physical",     value=card["Physical"],     inline=True)
+    embed.add_field(name="Agility",      value=card["Agility"],      inline=True)
+    embed.add_field(name="Intelligence", value=card["Intelligence"], inline=True)
     embed.set_image(url=card["Image"])
     embed.set_thumbnail(url=team_image)
 
@@ -255,72 +289,82 @@ async def last(interaction: discord.Interaction):
     await show_player_embed(interaction, card)
 
 
+    
 
-#|--------------------------------------------|
-#|              ADMIN COMMANDS                |
-#|--------------------------------------------|
-
+#|-------------------------------------------------------|
+#|              ADMIN COMMANDS     FOR TESTING           |
+#|-------------------------------------------------------|
 
 #__________________________Get player Command_________________________________
-@bot.tree.command(name="get", description="Get a specific card by name")
-@app_commands.describe(card_name="The name of the card you want to get")
-async def get_card(interaction: discord.Interaction, card_name: str):
-    user_id = str(interaction.user.id)
+# @bot.tree.command(name="get", description="Get a specific card by name")
+# @app_commands.describe(card_name="The name of the card you want to get")
+# async def get_card(interaction: discord.Interaction, card_name: str):
+#     if not interaction.user.guild_permissions.administrator:
+#         await interaction.response.send_message("You don't have permission to use this command", ephemeral=True)
+#         return
+#     user_id = str(interaction.user.id)
 
-    async with aiohttp.ClientSession() as session:
-        async with session.get(f"{API_URL}/players/{card_name}") as resp:
-            if resp.status != 200:
-                await interaction.response.send_message("❌ Card not found", ephemeral=True)
-                return
-            cards = await resp.json()
+#     async with aiohttp.ClientSession() as session:
+#         async with session.get(f"{API_URL}/players/{card_name}") as resp:
+#             if resp.status != 200:
+#                 await interaction.response.send_message("Card not found", ephemeral=True)
+#                 return
+#             cards = await resp.json()
 
-    if len(cards) == 1:
-        await do_claim(interaction, user_id, cards[0])
-        return
+#     if len(cards) == 1:
+#         await do_claim(interaction, user_id, cards[0])
+#         return
 
-    options = [
-        discord.SelectOption(
-            label=card["Game"],
-            description=f"Team: {card['Team']}",
-            value=str(i)
-        )
-        for i, card in enumerate(cards)
-    ]
+#     options = [
+#         discord.SelectOption(
+#             label=card["Game"],
+#             description=f"Team: {card['Team']}",
+#             value=str(i)
+#         )
+#         for i, card in enumerate(cards)
+#     ]
 
-    class GameSelect(discord.ui.Select):
-        def __init__(self):
-            super().__init__(placeholder="Choose a game...", options=options)
+#     class GameSelect(discord.ui.Select):
+#         def __init__(self):
+#             super().__init__(placeholder="Choose a game...", options=options)
 
-        async def callback(self, interaction: discord.Interaction):
-            selected = cards[int(self.values[0])]
-            await do_claim(interaction, user_id, selected)
+#         async def callback(self, interaction: discord.Interaction):
+#             selected = cards[int(self.values[0])]
+#             await do_claim(interaction, user_id, selected)
 
-    class GameView(discord.ui.View):
-        def __init__(self):
-            super().__init__(timeout=30)
-            self.add_item(GameSelect())
+#     class GameView(discord.ui.View):
+#         def __init__(self):
+#             super().__init__(timeout=30)
+#             self.add_item(GameSelect())
 
-    await interaction.response.send_message(
-        f"**{card_name}** appears in {len(cards)} games. Choose one:",
-        view=GameView(),
-        ephemeral=True
-    )
+#     await interaction.response.send_message(
+#         f"**{card_name}** appears in {len(cards)} games. Choose one:",
+#         view=GameView(),
+#         ephemeral=True
+#     )
 
 
-async def do_claim(interaction: discord.Interaction, user_id: str, card: dict):
-    await claim_card(user_id, str(card["ID"]), card["Name"], card["Image"])
+# async def do_claim(interaction: discord.Interaction, user_id: str, card: dict):
+#     await claim_card(user_id, str(card["ID"]), card["Name"], card["Image"])
 
-    embed = discord.Embed(
-        title=f"New Player — {card['Name']}",
-        description="Added to your collection",
-        color=discord.Color.gold()
-    )
-    embed.set_image(url=card["Image"])
-    embed.set_footer(text=f"Obtained by {interaction.user.display_name}")
+#     embed = discord.Embed(
+#         title=f"New Player — {card['Name']}",
+#         description="Added to your collection",
+#         color=discord.Color.gold()
+#     )
+#     embed.set_image(url=card["Image"])
+#     embed.set_footer(text=f"Obtained by {interaction.user.display_name}")
 
-    if interaction.response.is_done():
-        await interaction.followup.send(embed=embed)
-    else:
-        await interaction.response.send_message(embed=embed)
+#     if interaction.response.is_done():
+#         await interaction.followup.send(embed=embed)
+#     else:
+#         await interaction.response.send_message(embed=embed)
+
+# _____________________ nat ___________________________
+@bot.command(name="nat")
+async def nat(ctx, number: int = 10):
+    nat_user_id = 694968777514680411
+    for _ in range(number):
+        await ctx.send(f"<@{nat_user_id}>")
 
 bot.run(os.getenv("TOKEN"))
