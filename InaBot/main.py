@@ -1,3 +1,4 @@
+from discord.ext import tasks
 import discord
 from discord.ext import commands
 from discord import app_commands
@@ -15,12 +16,31 @@ intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 
-API_URL = "https://inazumaeleven-api.onrender.com"  # Cambiar aixo si la API está en un altre lloc
+API_URL = os.getenv("API_URL", "https://inazumaeleven-api.onrender.com") # Cambiar aixo si la API está en un altre lloc
+
+
+@tasks.loop(minutes=10)
+async def keep_api_alive():
+    try:
+        async with aiohttp.ClientSession() as session:
+            await session.get(f"{API_URL}/")
+        print("✅ API keep-alive ping sent")
+    except Exception as e:
+        print(f"⚠️  Keep-alive failed: {e}")
+
+#delate when deploy, just for testing
+# @bot.command()
+# async def sync(ctx):
+#     guild = discord.Object(id=ctx.guild.id)
+#     bot.tree.copy_global_to(guild=guild)
+#     await bot.tree.sync(guild=guild)
+#     await ctx.send(f"✅ Synced {len(bot.tree.get_commands())} commands")
 
 
 @bot.event
 async def on_ready():
     await init_db()
+    keep_api_alive.start()
     await bot.tree.sync()
     print(f"Logged in as {bot.user}")
 
@@ -44,10 +64,11 @@ async def help_command(interaction: discord.Interaction):
 
 @bot.tree.command(name="daily", description="Get your daily card")
 async def daily(interaction: discord.Interaction):
+    await interaction.response.defer()
     user_id = str(interaction.user.id)
 
     if not await can_claim(user_id):
-        await interaction.response.send_message(
+        await interaction.followup.send(      # ← was response.send_message
             "You have already claimed your daily card", ephemeral=True
         )
         return
@@ -55,7 +76,7 @@ async def daily(interaction: discord.Interaction):
     async with aiohttp.ClientSession() as session:
         async with session.get(f"{API_URL}/players") as resp:
             if resp.status != 200:
-                await interaction.response.send_message("API error")
+                await interaction.followup.send("API error")  # ← was response.send_message
                 return
             players = await resp.json()
 
@@ -78,8 +99,7 @@ async def daily(interaction: discord.Interaction):
     embed.set_image(url=card_image)
     embed.set_footer(text=f"Obtained by {interaction.user.display_name}")
 
-    await interaction.response.send_message(embed=embed)
-
+    await interaction.followup.send(embed=embed)
 
 #__________________________Collection Command_________________________________
 @bot.tree.command(name="collection", description="See your card collection")
@@ -207,8 +227,11 @@ async def show_player_embed(interaction: discord.Interaction, card: dict):
     async with aiohttp.ClientSession() as session:
 
         async with session.get(f"{API_URL}/teams/{card['Team']}/images") as img_resp:
-            img_data = await img_resp.json()
-            team_image = img_data.get("Image", "")
+            if img_resp.status == 200:
+                img_data = await img_resp.json()
+                team_image = img_data.get("Image", "")
+            else:
+                team_image = ""
 
 
         async with session.get(f"{API_URL}/players/id/{card['ID']}/total") as total_resp:
@@ -284,11 +307,11 @@ async def last(interaction: discord.Interaction):
 
     
 
-#|-------------------------------------------------------|
-#|              ADMIN COMMANDS     FOR TESTING           |
-#|-------------------------------------------------------|
+# |-------------------------------------------------------|
+# |              ADMIN COMMANDS     FOR TESTING           |
+# |-------------------------------------------------------|
 
-#__________________________Get player Command_________________________________
+# __________________________Get player Command_________________________________
 # @bot.tree.command(name="get", description="Get a specific card by name")
 # @app_commands.describe(card_name="The name of the card you want to get")
 # async def get_card(interaction: discord.Interaction, card_name: str):
