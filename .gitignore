@@ -1,3 +1,3 @@
-.env
-__pycache__
-.venv
+InaBot/.env
+InaBot/__pycache__
+InaBot/.venv
