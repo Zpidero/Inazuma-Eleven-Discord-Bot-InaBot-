@@ -7,4 +7,4 @@ RUN uv sync
 
 COPY . .
 EXPOSE 8000
-CMD [ "uv", "run", "main.py" ]
+CMD [ "uv", "run", "/InaBot/main.py" ]

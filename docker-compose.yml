@@ -1,11 +1,11 @@
 services:
   discord_bot:
     build:
-      context: ./InaBot
+      context: .
       dockerfile: Dockerfile
     ports:
       - "8000:8000"
-    command: sh -c "sh /app/banners/InaBot.sh && uv run main.py"
+    command: sh -c "sh /app/InaBot/banners/InaBot.sh && uv run /app/InaBot/main.py"
     env_file:
       - ./InaBot/.env
     volumes:
