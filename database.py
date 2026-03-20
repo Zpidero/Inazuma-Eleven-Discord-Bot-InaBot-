@@ -1,6 +1,6 @@
 import aiosqlite
 
-DB = "data/cards.db"
+DB = "InaBot/data/cards.db"
 
 async def init_db():
     async with aiosqlite.connect(DB) as db:
