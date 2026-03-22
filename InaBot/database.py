@@ -1,8 +1,9 @@
 import aiosqlite
-import dotenv
+from dotenv import load_dotenv
+import os
 
-dotenv.load_dotenv()
-DB = dotenv.getenv("DB_PATH")
+load_dotenv()
+DB = os.getenv("DB_PATH")
 
 async def init_db():
     async with aiosqlite.connect(DB) as db:
