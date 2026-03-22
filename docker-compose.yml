@@ -6,12 +6,14 @@ services:
     ports:
       - "8000:8000"
 
-    command: sh -c "sh /app/InaBot/banners/InaBot.sh && uv run main.py"
+    entrypoint: ["sh", "/app/InaBot/banner.sh"]
+    command: [ "uv", "run","python" ,"-m", "InaBot.main" ]
 
     env_file:
-      - ./InaBot/.env
+      - .env
+
     volumes:
-      - webdata:/app/InaBot/data
+      - webdata:/app/data
 
 volumes:
   webdata:

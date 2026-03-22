@@ -11,3 +11,5 @@ cat << 'EOF'
     Starting on http://0.0.0.0:8000 🐢
 
 EOF
+
+exec "$@"

@@ -5,7 +5,7 @@ from discord import app_commands
 import aiohttp
 import os
 from dotenv import load_dotenv
-from database import init_db, can_claim, claim_card, get_collection
+from InaBot.database import init_db, can_claim, claim_card, get_collection
 import random
 
 load_dotenv()
@@ -29,12 +29,14 @@ async def keep_api_alive():
         print(f"⚠️  Keep-alive failed: {e}")
 
 #delate when deploy, just for testing
-# @bot.command()
-# async def sync(ctx):
-#     guild = discord.Object(id=ctx.guild.id)
-#     bot.tree.copy_global_to(guild=guild)
-#     await bot.tree.sync(guild=guild)
-#     await ctx.send(f"✅ Synced {len(bot.tree.get_commands())} commands")
+
+
+@bot.command()
+async def sync(ctx):
+    guild = discord.Object(id=ctx.guild.id)
+    bot.tree.copy_global_to(guild=guild)
+    await bot.tree.sync(guild=guild)
+    await ctx.send(f"✅ Synced {len(bot.tree.get_commands())} commands")
 
 
 @bot.event
@@ -312,69 +314,69 @@ async def last(interaction: discord.Interaction):
 # |-------------------------------------------------------|
 
 # __________________________Get player Command_________________________________
-# @bot.tree.command(name="get", description="Get a specific card by name")
-# @app_commands.describe(card_name="The name of the card you want to get")
-# async def get_card(interaction: discord.Interaction, card_name: str):
-#     if not interaction.user.guild_permissions.administrator:
-#         await interaction.response.send_message("You don't have permission to use this command", ephemeral=True)
-#         return
-#     user_id = str(interaction.user.id)
+@bot.tree.command(name="get", description="Get a specific card by name")
+@app_commands.describe(card_name="The name of the card you want to get")
+async def get_card(interaction: discord.Interaction, card_name: str):
+    if not interaction.user.guild_permissions.administrator:
+        await interaction.response.send_message("You don't have permission to use this command", ephemeral=True)
+        return
+    user_id = str(interaction.user.id)
 
-#     async with aiohttp.ClientSession() as session:
-#         async with session.get(f"{API_URL}/players/{card_name}") as resp:
-#             if resp.status != 200:
-#                 await interaction.response.send_message("Card not found", ephemeral=True)
-#                 return
-#             cards = await resp.json()
+    async with aiohttp.ClientSession() as session:
+        async with session.get(f"{API_URL}/players/{card_name}") as resp:
+            if resp.status != 200:
+                await interaction.response.send_message("Card not found", ephemeral=True)
+                return
+            cards = await resp.json()
 
-#     if len(cards) == 1:
-#         await do_claim(interaction, user_id, cards[0])
-#         return
+    if len(cards) == 1:
+        await do_claim(interaction, user_id, cards[0])
+        return
 
-#     options = [
-#         discord.SelectOption(
-#             label=card["Game"],
-#             description=f"Team: {card['Team']}",
-#             value=str(i)
-#         )
-#         for i, card in enumerate(cards)
-#     ]
+    options = [
+        discord.SelectOption(
+            label=card["Game"],
+            description=f"Team: {card['Team']}",
+            value=str(i)
+        )
+        for i, card in enumerate(cards)
+    ]
 
-#     class GameSelect(discord.ui.Select):
-#         def __init__(self):
-#             super().__init__(placeholder="Choose a game...", options=options)
+    class GameSelect(discord.ui.Select):
+        def __init__(self):
+            super().__init__(placeholder="Choose a game...", options=options)
 
-#         async def callback(self, interaction: discord.Interaction):
-#             selected = cards[int(self.values[0])]
-#             await do_claim(interaction, user_id, selected)
+        async def callback(self, interaction: discord.Interaction):
+            selected = cards[int(self.values[0])]
+            await do_claim(interaction, user_id, selected)
 
-#     class GameView(discord.ui.View):
-#         def __init__(self):
-#             super().__init__(timeout=30)
-#             self.add_item(GameSelect())
+    class GameView(discord.ui.View):
+        def __init__(self):
+            super().__init__(timeout=30)
+            self.add_item(GameSelect())
 
-#     await interaction.response.send_message(
-#         f"**{card_name}** appears in {len(cards)} games. Choose one:",
-#         view=GameView(),
-#         ephemeral=True
-#     )
+    await interaction.response.send_message(
+        f"**{card_name}** appears in {len(cards)} games. Choose one:",
+        view=GameView(),
+        ephemeral=True
+    )
 
 
-# async def do_claim(interaction: discord.Interaction, user_id: str, card: dict):
-#     await claim_card(user_id, str(card["ID"]), card["Name"], card["Image"])
+async def do_claim(interaction: discord.Interaction, user_id: str, card: dict):
+    await claim_card(user_id, str(card["ID"]), card["Name"], card["Image"])
 
-#     embed = discord.Embed(
-#         title=f"New Player — {card['Name']}",
-#         description="Added to your collection",
-#         color=discord.Color.gold()
-#     )
-#     embed.set_image(url=card["Image"])
-#     embed.set_footer(text=f"Obtained by {interaction.user.display_name}")
+    embed = discord.Embed(
+        title=f"New Player — {card['Name']}",
+        description="Added to your collection",
+        color=discord.Color.gold()
+    )
+    embed.set_image(url=card["Image"])
+    embed.set_footer(text=f"Obtained by {interaction.user.display_name}")
 
-#     if interaction.response.is_done():
-#         await interaction.followup.send(embed=embed)
-#     else:
-#         await interaction.response.send_message(embed=embed)
+    if interaction.response.is_done():
+        await interaction.followup.send(embed=embed)
+    else:
+        await interaction.response.send_message(embed=embed)
 
 
 
@@ -1020,4 +1022,9 @@ async def nat(ctx, number: int = 10):
     for _ in range(number):
         await ctx.send(f"<@{nat_user_id}>")
 
-bot.run(os.getenv("TOKEN"))
+
+def main():
+    bot.run(os.getenv("TOKEN"))
+    
+if __name__ == "__main__":
+    main()

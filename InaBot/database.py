@@ -1,6 +1,8 @@
 import aiosqlite
+import dotenv
 
-DB = "InaBot/data/cards.db"
+dotenv.load_dotenv()
+DB = dotenv.getenv("DB_PATH")
 
 async def init_db():
     async with aiosqlite.connect(DB) as db:
