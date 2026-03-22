@@ -5,11 +5,13 @@ services:
       dockerfile: Dockerfile
     ports:
       - "8000:8000"
+
     command: sh -c "sh /app/InaBot/banners/InaBot.sh && uv run main.py"
+
     env_file:
       - ./InaBot/.env
     volumes:
-      - webdata:/app/data
+      - webdata:/app/InaBot/data
 
 volumes:
   webdata:
