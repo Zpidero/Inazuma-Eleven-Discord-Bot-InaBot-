@@ -47,7 +47,7 @@ async def can_claim(user_id):
             from datetime import datetime, timezone
             last = datetime.fromisoformat(row[0])
             now = datetime.now(timezone.utc).replace(tzinfo=None)
-            return (now - last).total_seconds() >= 86400  # 24h
+            return (now - last).total_seconds() >= 21600  # 6h
 
 async def get_collection(user_id):
     async with aiosqlite.connect(DB) as db:
