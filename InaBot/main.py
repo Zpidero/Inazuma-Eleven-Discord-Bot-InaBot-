@@ -54,7 +54,7 @@ async def help_command(interaction: discord.Interaction):
         description="Here's a list of available commands:",
         color=discord.Color.green()
     )
-    embed.add_field(name="/daily", value="Claim your daily card", inline=False)
+    embed.add_field(name="/claim", value="Claim you a card every 6 hours", inline=False)
     embed.add_field(name="/collection", value="View your card collection", inline=False)
     embed.add_field(name="/help", value="Show this help message", inline=False)
     embed.add_field(name="/show [card name]", value="Show details of a card you own", inline=False)
@@ -62,16 +62,16 @@ async def help_command(interaction: discord.Interaction):
 
     await interaction.response.send_message(embed=embed, ephemeral=True)
 
-#__________________________Daily Command_________________________________
+#Claim Command_________________________________
 
-@bot.tree.command(name="daily", description="Get your daily card")
-async def daily(interaction: discord.Interaction):
+@bot.tree.command(name="claim", description="Claim you a card every 6 hours")
+async def claim(interaction: discord.Interaction):
     await interaction.response.defer()
     user_id = str(interaction.user.id)
 
     if not await can_claim(user_id):
         await interaction.followup.send(      # ← was response.send_message
-            "You have already claimed your daily card", ephemeral=True
+            "You have already claimed your card recently wait 6 hours", ephemeral=True
         )
         return
 
@@ -111,7 +111,7 @@ async def collection(interaction: discord.Interaction):
 
     if not raw_cards:
         await interaction.response.send_message(
-            "You don't have any cards yet. Use `/daily` to get your first card!", ephemeral=True
+            "You don't have any cards yet. Use `/claim` to get your first card!", ephemeral=True
         )
         return
 
@@ -291,7 +291,7 @@ async def last(interaction: discord.Interaction):
 
     if not cards:
         await interaction.response.send_message(
-            "You don't have any cards yet. Use `/daily` to get your first card!", ephemeral=True
+            "You don't have any cards yet. Use `/claim` to get your first card!", ephemeral=True
         )
         return
 
