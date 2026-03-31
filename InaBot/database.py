@@ -36,7 +36,7 @@ async def claim_card(user_id, card_id, card_name, card_image):
         )
         await db.commit()
 
-async def can_claim(user_id):
+async def time_since_claim(user_id):
     async with aiosqlite.connect(DB) as db:
         async with db.execute(
             "SELECT last_claim FROM daily_claims WHERE user_id = ?", (user_id,)
@@ -47,7 +47,7 @@ async def can_claim(user_id):
             from datetime import datetime, timezone
             last = datetime.fromisoformat(row[0])
             now = datetime.now(timezone.utc).replace(tzinfo=None)
-            return (now - last).total_seconds() >= 21600  # 6h
+            return (now - last).total_seconds()
 
 async def get_collection(user_id):
     async with aiosqlite.connect(DB) as db:
