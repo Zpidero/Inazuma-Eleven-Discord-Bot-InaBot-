@@ -4,6 +4,7 @@ import os
 
 load_dotenv()
 DB = os.getenv("DB_PATH")
+CLAIM_WAIT_TIME = 21600 # 6 hours
 
 async def init_db():
     async with aiosqlite.connect(DB) as db:
@@ -47,7 +48,7 @@ async def time_since_claim(user_id):
             from datetime import datetime, timezone
             last = datetime.fromisoformat(row[0])
             now = datetime.now(timezone.utc).replace(tzinfo=None)
-            return (now - last).total_seconds()
+            return CLAIM_WAIT_TIME - (now - last).total_seconds()
 
 async def get_collection(user_id):
     async with aiosqlite.connect(DB) as db:
