@@ -2,10 +2,11 @@ from discord.ext import tasks
 import discord
 from discord.ext import commands
 from discord import app_commands
+from datetime import timedelta
 import aiohttp
 import os
 from dotenv import load_dotenv
-from InaBot.database import init_db, can_claim, claim_card, get_collection
+from InaBot.database import init_db, time_since_claim, claim_card, get_collection
 import random
 
 load_dotenv()
@@ -17,7 +18,7 @@ bot = commands.Bot(command_prefix="$$$", intents=intents)
 
 
 API_URL = os.getenv("API_URL", "https://inazumaeleven-api.onrender.com") # Cambiar aixo si la API está en un altre lloc
-
+CLAIM_WAIT_TIME = 21600 # 6 hours
 
 @tasks.loop(minutes=10)
 async def keep_api_alive():
@@ -68,10 +69,12 @@ async def help_command(interaction: discord.Interaction):
 async def claim(interaction: discord.Interaction):
     await interaction.response.defer()
     user_id = str(interaction.user.id)
-
-    if not await can_claim(user_id):
-        await interaction.followup.send(      # ← was response.send_message
-            "You have already claimed your card recently wait 6 hours", ephemeral=True
+    
+    claimed_ago = await time_since_claim(user_id)
+    if claimed_ago <= CLAIM_WAIT_TIME:
+        wait_time = str(timedelta(seconds=claimed_ago))
+        await interaction.followup.send(
+            f"You have already claimed your card. Next claim in {wait_time}", ephemeral=True
         )
         return
 
